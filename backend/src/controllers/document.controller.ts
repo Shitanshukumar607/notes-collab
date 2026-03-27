@@ -31,7 +31,10 @@ export const createDocument = async (
   const document = await prisma.document.create({
     data: {
       title: title || "Untitled",
-      content: {},
+      content: {
+        type: "doc",
+        content: [{ type: "paragraph" }],
+      },
       ownerId: session.user.id,
     },
   });

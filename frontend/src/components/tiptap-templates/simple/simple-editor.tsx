@@ -17,6 +17,7 @@ import { Selection } from "@tiptap/extensions"
 // --- UI Primitives ---
 import { Button } from "@/components/tiptap-ui-primitive/button"
 import { Spacer } from "@/components/tiptap-ui-primitive/spacer"
+import { Placeholder } from "@tiptap/extension-placeholder"
 import {
   Toolbar,
   ToolbarGroup,
@@ -230,6 +231,10 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
         limit: 3,
         upload: handleImageUpload,
         onError: (error) => console.error("Upload failed:", error),
+      }),
+      Placeholder.configure({
+        placeholder: "Write something amazing...",
+        showOnlyWhenEditable: true,
       }),
     ],
     onUpdate: ({ editor }) => {

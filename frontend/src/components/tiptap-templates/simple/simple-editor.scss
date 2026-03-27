@@ -80,3 +80,15 @@ body,
     padding: 1rem 1.5rem 30vh;
   }
 }
+
+.tiptap p.is-editor-empty:first-child::before {
+  color: var(--tt-gray-light-500);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.dark .tiptap p.is-editor-empty:first-child::before {
+  color: var(--tt-gray-dark-500);
+}
