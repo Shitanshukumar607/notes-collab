@@ -75,6 +75,8 @@ import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss"
 
+import { SidebarTrigger } from "@/components/ui/sidebar"
+
 const MainToolbarContent = ({
   onHighlighterClick,
   onLinkClick,
@@ -86,6 +88,7 @@ const MainToolbarContent = ({
 }) => {
   return (
     <>
+      <SidebarTrigger className="-ml-1 mr-1" />
       <Spacer />
 
       <ToolbarGroup>
