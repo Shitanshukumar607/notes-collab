@@ -97,7 +97,7 @@ export default function Sidebar() {
 
       <div className="flex-1 overflow-y-auto mt-4">
         <div className="flex flex-col gap-[2px] px-3">
-          <div className="px-2 text-[11px] font-bold text-sidebar-foreground/40 uppercase tracking-widest mb-1.5 flex items-center justify-between group">
+          <div className="px-2 text-[11px] font-bold text-sidebar-foreground/40 uppercase tracking-widest mb-1.5 flex items-center justify-between">
             <span>Workspace</span>
             <button 
               onClick={handleCreateDocument}
@@ -107,7 +107,7 @@ export default function Sidebar() {
               {creating ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <Plus className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" />
+                <Plus className="w-3.5 h-3.5 cursor-pointer" />
               )}
             </button>
           </div>
