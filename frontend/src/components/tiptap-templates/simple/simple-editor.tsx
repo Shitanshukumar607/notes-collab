@@ -1,56 +1,59 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { EditorContent, EditorContext, useEditor } from "@tiptap/react"
+import { useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
 
 // --- Tiptap Core Extensions ---
-import { StarterKit } from "@tiptap/starter-kit"
+import { Highlight } from "@tiptap/extension-highlight"
 import { Image } from "@tiptap/extension-image"
 import { TaskItem, TaskList } from "@tiptap/extension-list"
-import { TextAlign } from "@tiptap/extension-text-align"
-import { Typography } from "@tiptap/extension-typography"
-import { Highlight } from "@tiptap/extension-highlight"
 import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
+import { TextAlign } from "@tiptap/extension-text-align"
+import { Typography } from "@tiptap/extension-typography"
 import { Selection } from "@tiptap/extensions"
+import { StarterKit } from "@tiptap/starter-kit"
 
 // --- UI Primitives ---
 import { Button } from "@/components/tiptap-ui-primitive/button"
 import { Spacer } from "@/components/tiptap-ui-primitive/spacer"
-import { Placeholder } from "@tiptap/extension-placeholder"
 import {
   Toolbar,
   ToolbarGroup,
   ToolbarSeparator,
 } from "@/components/tiptap-ui-primitive/toolbar"
+import { Placeholder } from "@tiptap/extension-placeholder"
 
 // --- Tiptap Node ---
-import { ImageUploadNode } from "@/components/tiptap-node/image-upload-node/image-upload-node-extension"
-import { HorizontalRule } from "@/components/tiptap-node/horizontal-rule-node/horizontal-rule-node-extension"
 import "@/components/tiptap-node/blockquote-node/blockquote-node.scss"
 import "@/components/tiptap-node/code-block-node/code-block-node.scss"
-import "@/components/tiptap-node/horizontal-rule-node/horizontal-rule-node.scss"
-import "@/components/tiptap-node/list-node/list-node.scss"
-import "@/components/tiptap-node/image-node/image-node.scss"
 import "@/components/tiptap-node/heading-node/heading-node.scss"
+import { HorizontalRule } from "@/components/tiptap-node/horizontal-rule-node/horizontal-rule-node-extension"
+import "@/components/tiptap-node/horizontal-rule-node/horizontal-rule-node.scss"
+import "@/components/tiptap-node/image-node/image-node.scss"
+import { ImageUploadNode } from "@/components/tiptap-node/image-upload-node/image-upload-node-extension"
+import "@/components/tiptap-node/list-node/list-node.scss"
 import "@/components/tiptap-node/paragraph-node/paragraph-node.scss"
 
 // --- Tiptap UI ---
-import { HeadingDropdownMenu } from "@/components/tiptap-ui/heading-dropdown-menu"
-import { ImageUploadButton } from "@/components/tiptap-ui/image-upload-button"
-import { ListDropdownMenu } from "@/components/tiptap-ui/list-dropdown-menu"
 import { BlockquoteButton } from "@/components/tiptap-ui/blockquote-button"
 import { CodeBlockButton } from "@/components/tiptap-ui/code-block-button"
 import {
   ColorHighlightPopover,
-  ColorHighlightPopoverContent,
   ColorHighlightPopoverButton,
+  ColorHighlightPopoverContent,
 } from "@/components/tiptap-ui/color-highlight-popover"
+import { HeadingDropdownMenu } from "@/components/tiptap-ui/heading-dropdown-menu"
+import { ImageUploadButton } from "@/components/tiptap-ui/image-upload-button"
 import {
-  LinkPopover,
-  LinkContent,
   LinkButton,
+  LinkContent,
+  LinkPopover,
 } from "@/components/tiptap-ui/link-popover"
+import { ListDropdownMenu } from "@/components/tiptap-ui/list-dropdown-menu"
 import { MarkButton } from "@/components/tiptap-ui/mark-button"
 import { TextAlignButton } from "@/components/tiptap-ui/text-align-button"
 import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
@@ -59,21 +62,21 @@ import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
 import { HighlighterIcon } from "@/components/tiptap-icons/highlighter-icon"
 import { LinkIcon } from "@/components/tiptap-icons/link-icon"
-import { Loader2, Users, Clock } from "lucide-react"
+import { Clock, Loader2, Users } from "lucide-react"
 
 // --- Hooks ---
+import { useCursorVisibility } from "@/hooks/use-cursor-visibility"
 import { useIsBreakpoint } from "@/hooks/use-is-breakpoint"
 import { useWindowSize } from "@/hooks/use-window-size"
-import { useCursorVisibility } from "@/hooks/use-cursor-visibility"
 import { formatDistanceToNow } from "date-fns"
 
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogDescription,
 } from "@/components/ui/dialog"
 
 // --- Components ---
@@ -86,7 +89,7 @@ import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 import "@/components/tiptap-templates/simple/simple-editor.scss"
 
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 const MainToolbarContent = ({
   onHighlighterClick,
@@ -196,13 +199,21 @@ const MobileToolbarContent = ({
     )}
   </>
 )
+
 const CollaboratorsDialog = ({
   collaborators,
   owner,
+  onAddCollaborator,
+  isAdding,
 }: {
   collaborators: any[]
   owner: any
+  onAddCollaborator: (email: string, role: string) => void
+  isAdding: boolean
 }) => {
+  const [email, setEmail] = useState("")
+  const [role, setRole] = useState<"EDITOR" | "VIEWER">("EDITOR")
+
   if (!owner) return null
 
   // Combine owner and collaborators into a single list
@@ -210,6 +221,12 @@ const CollaboratorsDialog = ({
     { user: owner, role: "OWNER" },
     ...collaborators.filter((c) => c.userId !== owner.id),
   ]
+
+  const handleAdd = () => {
+    if (!email) return
+    onAddCollaborator(email, role)
+    setEmail("")
+  }
 
   return (
     <Dialog>
@@ -226,41 +243,84 @@ const CollaboratorsDialog = ({
         <DialogHeader>
           <DialogTitle>Document Access</DialogTitle>
           <DialogDescription>
-            These people have access to this document.
+            Invite others to collaborate on this document.
           </DialogDescription>
         </DialogHeader>
+
         <div className="space-y-4 py-4">
-          {allAccess.map((item, idx) => (
-            <div
-              key={idx}
-              className="flex items-center justify-between gap-4 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-medium shadow-sm overflow-hidden shrink-0">
-                  {item.user.image ? (
-                    <img
-                      src={item.user.image}
-                      alt={item.user.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    item.user.name.charAt(0).toUpperCase()
-                  )}
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-semibold text-foreground truncate">
-                    {item.user.name}
-                  </span>
-                  <span className="text-xs text-muted-foreground truncate">
-                    {item.user.email}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
-                {item.role}
-              </div>
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Add Collaborator</Label>
+            <div className="flex gap-2">
+              <Input
+                id="email"
+                placeholder="email@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="flex-1 text-xs"
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              />
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as any)}
+                className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="EDITOR">Editor</option>
+                <option value="VIEWER">Viewer</option>
+              </select>
+              <Button
+                variant="primary"
+                size="small"
+                onClick={handleAdd}
+                disabled={isAdding || !email}
+                className="h-8 px-3"
+              >
+                {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : "Invite"}
+              </Button>
             </div>
-          ))}
+          </div>
+
+          <div className="h-px bg-border" />
+
+          <div className="space-y-3">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">People with access</Label>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+              {allAccess.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between gap-4 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-medium shadow-sm overflow-hidden shrink-0 text-xs">
+                      {item.user.image ? (
+                        <img
+                          src={item.user.image}
+                          alt={item.user.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        item.user.name?.charAt(0).toUpperCase() || item.user.email?.charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-semibold text-foreground truncate">
+                        {item.user.name || "Anonymous"}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {item.user.email}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={`flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${
+                    item.role === "OWNER" 
+                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" 
+                      : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                  }`}>
+                    {item.role}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -273,11 +333,15 @@ const EditorTopbar = ({
   updatedAt,
   collaborators,
   owner,
+  onAddCollaborator,
+  isAdding,
 }: {
   title: string
   updatedAt?: string
   collaborators: any[]
   owner: any
+  onAddCollaborator: (email: string, role: string) => void
+  isAdding: boolean
 }) => {
   return (
     <div className="flex items-center justify-between px-4 py-0 border-b bg-background/80 backdrop-blur-md sticky top-0 z-50 h-12">
@@ -315,7 +379,12 @@ const EditorTopbar = ({
 
         <div className="h-4 w-px bg-border hidden sm:block" />
 
-        <CollaboratorsDialog collaborators={collaborators} owner={owner} />
+        <CollaboratorsDialog 
+          collaborators={collaborators} 
+          owner={owner} 
+          onAddCollaborator={onAddCollaborator}
+          isAdding={isAdding}
+        />
       </div>
     </div>
   )
@@ -356,6 +425,18 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
       if (updatedDoc.title) {
         queryClient.invalidateQueries({ queryKey: ["documents"] })
       }
+    },
+  })
+
+  const addCollaboratorMutation = useMutation({
+    mutationFn: ({ email, role }: { email: string; role: string }) =>
+      documentClient.addCollaborator(documentId, email, role),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["document", documentId] })
+      toast.success("Collaborator added successfully")
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || "Failed to add collaborator")
     },
   })
 
@@ -467,6 +548,8 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
           updatedAt={document.updatedAt}
           collaborators={document.collaborators || []}
           owner={document.owner}
+          onAddCollaborator={(email, role) => addCollaboratorMutation.mutate({ email, role })}
+          isAdding={addCollaboratorMutation.isPending}
         />
         <Toolbar
           ref={toolbarRef}
