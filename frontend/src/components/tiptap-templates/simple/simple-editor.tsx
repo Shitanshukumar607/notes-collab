@@ -58,6 +58,7 @@ import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
 import { HighlighterIcon } from "@/components/tiptap-icons/highlighter-icon"
 import { LinkIcon } from "@/components/tiptap-icons/link-icon"
+import { Loader2 } from "lucide-react"
 
 // --- Hooks ---
 import { useIsBreakpoint } from "@/hooks/use-is-breakpoint"
@@ -72,8 +73,6 @@ import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss"
-
-import content from "@/components/tiptap-templates/simple/data/content.json"
 
 const MainToolbarContent = ({
   onHighlighterClick,
@@ -183,12 +182,17 @@ const MobileToolbarContent = ({
   </>
 )
 
-export function SimpleEditor() {
+import { documentClient } from "@/lib/document-client"
+import { debounce } from "lodash"
+
+export function SimpleEditor({ documentId }: { documentId: string }) {
   const isMobile = useIsBreakpoint()
   const { height } = useWindowSize()
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
     "main"
   )
+  const [title, setTitle] = useState("")
+  const [loading, setLoading] = useState(true)
   const toolbarRef = useRef<HTMLDivElement>(null)
 
   const editor = useEditor({
@@ -228,8 +232,51 @@ export function SimpleEditor() {
         onError: (error) => console.error("Upload failed:", error),
       }),
     ],
-    content,
+    onUpdate: ({ editor }) => {
+      debouncedSave(editor.getJSON())
+    },
   })
+
+  const debouncedSave = useRef(
+    debounce(async (content: any) => {
+      try {
+        await documentClient.update(documentId, { content })
+      } catch (error) {
+        console.error("Failed to save document content", error)
+      }
+    }, 1000)
+  ).current
+
+  const handleTitleChange = async (newTitle: string) => {
+    setTitle(newTitle)
+    try {
+      await documentClient.update(documentId, { title: newTitle })
+      // Consider updating the sidebar title as well, maybe via a context or higher-level state
+    } catch (error) {
+      console.error("Failed to update title", error)
+    }
+  }
+
+  useEffect(() => {
+    const fetchDoc = async () => {
+      setLoading(true)
+      try {
+        const doc = await documentClient.get(documentId)
+        setTitle(doc.title)
+        if (editor) {
+          editor.commands.setContent(doc.content || "")
+        }
+      } catch (error) {
+        console.error("Failed to load document", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (documentId && editor) {
+      fetchDoc()
+    }
+  }, [documentId, editor])
 
   const rect = useCursorVisibility({
     editor,
@@ -241,6 +288,14 @@ export function SimpleEditor() {
       setMobileView("main")
     }
   }, [isMobile, mobileView])
+
+  if (loading) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="simple-editor-wrapper">
@@ -269,11 +324,20 @@ export function SimpleEditor() {
           )}
         </Toolbar>
 
-        <EditorContent
-          editor={editor}
-          role="presentation"
-          className="simple-editor-content"
-        />
+        <div className="max-w-[750px] mx-auto w-full pt-16 px-8">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => handleTitleChange(e.target.value)}
+            className="w-full text-4xl font-bold bg-transparent border-none outline-none mb-4 placeholder:text-muted-foreground/30"
+            placeholder="Untitled"
+          />
+          <EditorContent
+            editor={editor}
+            role="presentation"
+            className="simple-editor-content"
+          />
+        </div>
       </EditorContext.Provider>
     </div>
   )

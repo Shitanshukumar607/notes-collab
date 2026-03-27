@@ -1,11 +1,51 @@
-import { Search, Settings, FileText, Star, Clock, LogOut, User as UserIcon, ChevronDown, Plus } from "lucide-react";
+import { Search, Settings, FileText, Clock, LogOut, User as UserIcon, ChevronDown, Plus, Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { documentClient } from "@/lib/document-client";
+
+interface Document {
+  id: string;
+  title: string;
+}
 
 export default function Sidebar() {
   const { data: session } = authClient.useSession();
   const navigate = useNavigate();
+  const { id: activeId } = useParams();
   const user = session?.user;
+
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
+  const fetchDocuments = async () => {
+    try {
+      const docs = await documentClient.list();
+      setDocuments(docs);
+    } catch (error) {
+      console.error("Failed to fetch documents", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateDocument = async () => {
+    setCreating(true);
+    try {
+      const newDoc = await documentClient.create("Untitled");
+      setDocuments([newDoc, ...documents]);
+      navigate(`/doc/${newDoc.id}`);
+    } catch (error) {
+      console.error("Failed to create document", error);
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const handleLogout = async () => {
     await authClient.signOut({
@@ -21,13 +61,6 @@ export default function Sidebar() {
     { icon: Search, label: "Search", shortcut: "⌘K" },
     { icon: Clock, label: "Recent" },
     { icon: Settings, label: "Settings" },
-  ];
-
-  const docs = [
-    { icon: FileText, label: "Private Roadmap", active: true },
-    { icon: FileText, label: "Engineering Setup" },
-    { icon: Star, label: "Design System Guidelines" },
-    { icon: FileText, label: "Meeting Notes" },
   ];
 
   return (
@@ -66,17 +99,42 @@ export default function Sidebar() {
         <div className="flex flex-col gap-[2px] px-3">
           <div className="px-2 text-[11px] font-bold text-sidebar-foreground/40 uppercase tracking-widest mb-1.5 flex items-center justify-between group">
             <span>Workspace</span>
-            <Plus className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-sidebar-accent p-[2px] rounded" />
+            <button 
+              onClick={handleCreateDocument}
+              disabled={creating}
+              className="p-[2px] rounded hover:bg-sidebar-accent transition-colors"
+            >
+              {creating ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Plus className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" />
+              )}
+            </button>
           </div>
-          {docs.map((doc, idx) => (
+          
+          {loading && (
+             <div className="px-2 py-1.5 flex items-center gap-2 text-sidebar-foreground/40">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span className="text-xs">Loading...</span>
+             </div>
+          )}
+
+          {!loading && documents.length === 0 && (
+            <div className="px-2 py-1.5 text-xs text-sidebar-foreground/40 italic">
+                No documents yet
+            </div>
+          )}
+
+          {documents.map((doc) => (
             <button
-              key={idx}
+              key={doc.id}
+              onClick={() => navigate(`/doc/${doc.id}`)}
               className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-md transition-all duration-150 text-sm font-medium ${
-                doc.active ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" : "hover:bg-sidebar-accent/50 text-sidebar-foreground/80 hover:text-sidebar-foreground"
+                activeId === doc.id ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" : "hover:bg-sidebar-accent/50 text-sidebar-foreground/80 hover:text-sidebar-foreground"
               }`}
             >
-              <doc.icon className={`w-4 h-4 ${doc.active ? "text-sidebar-accent-foreground" : "text-sidebar-foreground/60"}`} />
-              <span className="truncate">{doc.label}</span>
+              <FileText className={`w-4 h-4 ${activeId === doc.id ? "text-sidebar-accent-foreground" : "text-sidebar-foreground/60"}`} />
+              <span className="truncate">{doc.title}</span>
             </button>
           ))}
         </div>

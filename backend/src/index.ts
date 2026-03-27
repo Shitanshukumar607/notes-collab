@@ -4,12 +4,12 @@ import { createServer } from "http";
 import { Server, Socket } from "socket.io";
 import cors from "cors";
 import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
-import { auth } from "./auth";
+import { auth } from "./lib/auth";
+import documentRoutes from "./routes/document.routes";
 
 const app = express();
 const httpServer = createServer(app);
 
-// Configure CORS for Express — must come before Better Auth handler
 app.use(
   cors({
     origin: "http://localhost:5173",
@@ -18,11 +18,11 @@ app.use(
   }),
 );
 
-// Mount Better Auth handler BEFORE express.json()
 app.all("/api/auth/*splat", toNodeHandler(auth));
 
-// Mount express.json() for other routes only
 app.use(express.json());
+
+app.use("/api/documents", documentRoutes);
 
 const io = new Server(httpServer, {
   cors: {
@@ -32,13 +32,12 @@ const io = new Server(httpServer, {
   },
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 app.get("/", (req, res) => {
   res.send("Server is running");
 });
 
-// Session endpoint
 app.get("/api/me", async (req, res) => {
   const session = await auth.api.getSession({
     headers: fromNodeHeaders(req.headers),

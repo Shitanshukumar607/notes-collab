@@ -1,9 +1,24 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import { authClient } from "@/lib/auth-client";
 import Sidebar from "./components/Sidebar";
 import { SimpleEditor } from "./components/tiptap-templates/simple/simple-editor";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
+
+function EditorWrapper() {
+  const { id } = useParams();
+  
+  if (!id) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8">
+        <h2 className="text-2xl font-semibold mb-2">Select a document</h2>
+        <p>Choose a document from the sidebar or create a new one to get started.</p>
+      </div>
+    );
+  }
+
+  return <SimpleEditor documentId={id} />;
+}
 
 function ProtectedApp() {
   const { data: session, isPending } = authClient.useSession();
@@ -24,7 +39,10 @@ function ProtectedApp() {
     <div className="flex h-screen w-full bg-background text-foreground font-sans overflow-hidden">
       <Sidebar />
       <main className="flex-1 flex justify-center overflow-y-auto overflow-x-hidden w-full relative">
-        <SimpleEditor />
+        <Routes>
+           <Route path="/doc/:id" element={<EditorWrapper />} />
+           <Route path="/" element={<EditorWrapper />} />
+        </Routes>
       </main>
     </div>
   );

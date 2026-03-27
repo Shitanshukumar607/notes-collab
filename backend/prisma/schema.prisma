@@ -7,18 +7,18 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(uuid())
+  id            String   @id @default(uuid())
   name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
+  email         String   @unique
+  emailVerified Boolean  @default(false)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  sessions  Session[]
-  accounts  Account[]
-  documents Document[]
-  collaborations  Collaboration[]
+  sessions       Session[]
+  accounts       Account[]
+  documents      Document[]
+  collaborations Collaboration[]
 
   @@map("user")
 }
@@ -59,7 +59,7 @@ model Collaboration {
   @@index([documentId])
 }
 
-enum Role { 
+enum Role {
   OWNER
   EDITOR
   VIEWER
@@ -81,10 +81,10 @@ model Session {
 }
 
 model Account {
-  id                    String    @id @default(uuid())
-  accountId             String
-  providerId            String
-  userId                String
+  id         String @id @default(uuid())
+  accountId  String
+  providerId String
+  userId     String
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
