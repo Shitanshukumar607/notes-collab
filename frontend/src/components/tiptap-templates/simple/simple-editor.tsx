@@ -90,6 +90,7 @@ import "@/components/tiptap-templates/simple/simple-editor.scss"
 
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { authClient } from "@/lib/auth-client"
 
 const MainToolbarContent = ({
   onHighlighterClick,
@@ -205,11 +206,13 @@ const CollaboratorsDialog = ({
   owner,
   onAddCollaborator,
   isAdding,
+  canInvite,
 }: {
   collaborators: any[]
   owner: any
   onAddCollaborator: (email: string, role: string) => void
   isAdding: boolean
+  canInvite: boolean
 }) => {
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<"EDITOR" | "VIEWER">("EDITOR")
@@ -248,38 +251,40 @@ const CollaboratorsDialog = ({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Add Collaborator</Label>
-            <div className="flex gap-2">
-              <Input
-                id="email"
-                placeholder="email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="flex-1 text-xs"
-                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-              />
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as any)}
-                className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="EDITOR">Editor</option>
-                <option value="VIEWER">Viewer</option>
-              </select>
-              <Button
-                variant="primary"
-                size="small"
-                onClick={handleAdd}
-                disabled={isAdding || !email}
-                className="h-8 px-3"
-              >
-                {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : "Invite"}
-              </Button>
+          {canInvite && (
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Add Collaborator</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="email"
+                  placeholder="email@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="flex-1 text-xs"
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                />
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as any)}
+                  className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="EDITOR">Editor</option>
+                  <option value="VIEWER">Viewer</option>
+                </select>
+                <Button
+                  variant="primary"
+                  size="small"
+                  onClick={handleAdd}
+                  disabled={isAdding || !email}
+                  className="h-8 px-3"
+                >
+                  {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : "Invite"}
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="h-px bg-border" />
+          {canInvite && <div className="h-px bg-border" />}
 
           <div className="space-y-3">
             <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">People with access</Label>
@@ -335,6 +340,7 @@ const EditorTopbar = ({
   owner,
   onAddCollaborator,
   isAdding,
+  canInvite,
 }: {
   title: string
   updatedAt?: string
@@ -342,6 +348,7 @@ const EditorTopbar = ({
   owner: any
   onAddCollaborator: (email: string, role: string) => void
   isAdding: boolean
+  canInvite: boolean
 }) => {
   return (
     <div className="flex items-center justify-between px-4 py-0 border-b bg-background/80 backdrop-blur-md sticky top-0 z-50 h-12">
@@ -384,6 +391,7 @@ const EditorTopbar = ({
           owner={owner} 
           onAddCollaborator={onAddCollaborator}
           isAdding={isAdding}
+          canInvite={canInvite}
         />
       </div>
     </div>
@@ -400,6 +408,7 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
     "main"
   )
+  const { data: session } = authClient.useSession()
   const toolbarRef = useRef<HTMLDivElement>(null)
   const [localTitle, setLocalTitle] = useState("")
 
@@ -427,6 +436,14 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
       }
     },
   })
+
+  // Role management
+  const currentUserRole = document?.ownerId === session?.user?.id 
+    ? 'OWNER' 
+    : document?.collaborators?.find((c: any) => c.userId === session?.user?.id)?.role;
+
+  const isViewer = currentUserRole === 'VIEWER';
+  const canInvite = document?.ownerId === session?.user?.id;
 
   const addCollaboratorMutation = useMutation({
     mutationFn: ({ email, role }: { email: string; role: string }) =>
@@ -482,7 +499,9 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
       }),
     ],
     onUpdate: ({ editor }) => {
-      debouncedSave(editor.getJSON())
+      if (!isViewer) {
+        debouncedSave(editor.getJSON())
+      }
     },
   })
 
@@ -499,19 +518,28 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
   ).current
 
   const handleTitleChange = (newTitle: string) => {
+    if (isViewer) return
     setLocalTitle(newTitle)
     debouncedTitleSave(newTitle)
   }
 
   useEffect(() => {
-    if (document && editor && !editor.isFocused) {
-      // Only set content if it's different to avoid cursor jumps
-      const currentContent = editor.getJSON()
-      if (JSON.stringify(currentContent) !== JSON.stringify(document.content)) {
-        editor.commands.setContent(document.content || "")
+    if (document && editor) {
+      // Sync editability
+      if (editor.isEditable !== !isViewer) {
+        editor.setEditable(!isViewer);
+      }
+
+      // Sync content if not editing
+      if (!editor.isFocused) {
+        // Only set content if it's different to avoid cursor jumps
+        const currentContent = editor.getJSON()
+        if (JSON.stringify(currentContent) !== JSON.stringify(document.content)) {
+          editor.commands.setContent(document.content || "")
+        }
       }
     }
-  }, [document, editor])
+  }, [document, editor, isViewer])
 
   const rect = useCursorVisibility({
     editor,
@@ -550,36 +578,40 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
           owner={document.owner}
           onAddCollaborator={(email, role) => addCollaboratorMutation.mutate({ email, role })}
           isAdding={addCollaboratorMutation.isPending}
+          canInvite={canInvite}
         />
-        <Toolbar
-          ref={toolbarRef}
-          style={{
-            ...(isMobile
-              ? {
-                  bottom: `calc(100% - ${height - rect.y}px)`,
-                }
-              : {
-                  top: "48px",
-                }),
-          }}
-        >
-          {mobileView === "main" ? (
-            <MainToolbarContent
-              onHighlighterClick={() => setMobileView("highlighter")}
-              onLinkClick={() => setMobileView("link")}
-              isMobile={isMobile}
-            />
-          ) : (
-            <MobileToolbarContent
-              type={mobileView === "highlighter" ? "highlighter" : "link"}
-              onBack={() => setMobileView("main")}
-            />
-          )}
-        </Toolbar>
+        {!isViewer && (
+          <Toolbar
+            ref={toolbarRef}
+            style={{
+              ...(isMobile
+                ? {
+                    bottom: `calc(100% - ${height - rect.y}px)`,
+                  }
+                : {
+                    top: "48px",
+                  }),
+            }}
+          >
+            {mobileView === "main" ? (
+              <MainToolbarContent
+                onHighlighterClick={() => setMobileView("highlighter")}
+                onLinkClick={() => setMobileView("link")}
+                isMobile={isMobile}
+              />
+            ) : (
+              <MobileToolbarContent
+                type={mobileView === "highlighter" ? "highlighter" : "link"}
+                onBack={() => setMobileView("main")}
+              />
+            )}
+          </Toolbar>
+        )}
 
         <div className="max-w-[750px] mx-auto w-full pt-16 px-8">
           <input
             type="text"
+            readOnly={isViewer}
             value={localTitle}
             onChange={(e) => handleTitleChange(e.target.value)}
             className="w-full text-4xl font-bold bg-transparent border-none outline-none mb-4 placeholder:text-muted-foreground/30"
