@@ -8,55 +8,113 @@ import {
   ChevronDown,
   Plus,
   Loader2,
+  MoreHorizontal,
+  Trash2,
+  UserPlus,
+  ChevronRight,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { documentClient } from "@/lib/document-client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface Document {
   id: string;
   title: string;
+  ownerId: string;
 }
 
 import { Sidebar as ShadcnSidebar } from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 export default function Sidebar() {
+  const queryClient = useQueryClient();
   const { data: session } = authClient.useSession();
   const navigate = useNavigate();
   const { id: activeId } = useParams();
   const user = session?.user;
 
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
+  const [isCollaboratorDialogOpen, setIsCollaboratorDialogOpen] = useState(false);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [collaboratorEmail, setCollaboratorEmail] = useState("");
 
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
+  const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
+  const [sharedDocsExpanded, setSharedDocsExpanded] = useState(true);
 
-  const fetchDocuments = async () => {
-    try {
-      const docs = await documentClient.list();
-      setDocuments(docs);
-    } catch (error) {
-      console.error("Failed to fetch documents", error);
-    } finally {
-      setLoading(false);
-    }
+  // Queries
+  const { data: documents = [], isLoading } = useQuery<Document[]>({
+    queryKey: ["documents"],
+    queryFn: () => documentClient.list(),
+  });
+
+  // Mutations
+  const createMutation = useMutation({
+    mutationFn: (title: string) => documentClient.create(title),
+    onSuccess: (newDoc) => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      navigate(`/doc/${newDoc.id}`);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => documentClient.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      if (activeId && !documents.find((d: Document) => d.id === activeId)) {
+        navigate("/");
+      }
+    },
+  });
+
+  const addCollaboratorMutation = useMutation({
+    mutationFn: ({ id, email }: { id: string; email: string }) =>
+      documentClient.addCollaborator(id, email, "EDITOR"),
+    onSuccess: (_, variables) => {
+      setIsCollaboratorDialogOpen(false);
+      setCollaboratorEmail("");
+      setSelectedDocumentId(null);
+      // Invalidate both the list and the specific document
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      queryClient.invalidateQueries({ queryKey: ["document", variables.id] });
+    },
+    onError: (error) => {
+      console.error("Failed to add collaborator", error);
+      alert("Failed to add collaborator. Make sure the email is correct.");
+    },
+  });
+
+  const workspaceDocs = documents.filter((doc: Document) => doc.ownerId === user?.id);
+  const sharedDocs = documents.filter((doc: Document) => doc.ownerId !== user?.id);
+
+  const handleCreateDocument = () => {
+    createMutation.mutate("Untitled");
   };
 
-  const handleCreateDocument = async () => {
-    setCreating(true);
-    try {
-      const newDoc = await documentClient.create("Untitled");
-      setDocuments([newDoc, ...documents]);
-      navigate(`/doc/${newDoc.id}`);
-    } catch (error) {
-      console.error("Failed to create document", error);
-    } finally {
-      setCreating(false);
-    }
+  const handleDeleteDocument = (id: string) => {
+    if (!confirm("Are you sure you want to delete this document?")) return;
+    deleteMutation.mutate(id);
+  };
+
+  const handleAddCollaborator = () => {
+    if (!selectedDocumentId || !collaboratorEmail) return;
+    addCollaboratorMutation.mutate({ id: selectedDocumentId, email: collaboratorEmail });
   };
 
   const handleLogout = async () => {
@@ -117,18 +175,26 @@ export default function Sidebar() {
               )}
             </button>
           ))}
-        </nav>
-
-        <div className="flex-1 overflow-y-auto mt-4">
+        </nav>        <div className="flex-1 overflow-y-auto mt-4">
           <div className="flex flex-col gap-[2px] px-3">
-            <div className="px-2 text-[11px] font-bold text-sidebar-foreground/40 uppercase tracking-widest mb-1.5 flex items-center justify-between">
-              <span>Workspace</span>
+            <div className="px-1 text-[11px] font-bold text-sidebar-foreground/40 uppercase tracking-widest mb-1.5 flex items-center justify-between group/header">
+              <button 
+                onClick={() => setWorkspaceExpanded(!workspaceExpanded)}
+                className="flex items-center gap-1 hover:text-sidebar-foreground/60 transition-colors"
+              >
+                {workspaceExpanded ? (
+                  <ChevronDown className="w-3 h-3" />
+                ) : (
+                  <ChevronRight className="w-3 h-3" />
+                )}
+                <span>Workspace</span>
+              </button>
               <button
                 onClick={handleCreateDocument}
-                disabled={creating}
-                className="p-[2px] rounded hover:bg-sidebar-accent transition-colors"
+                disabled={createMutation.isPending}
+                className="p-[2px] rounded hover:bg-sidebar-accent transition-colors opacity-0 group-hover/header:opacity-100"
               >
-                {creating ? (
+                {createMutation.isPending ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
                   <Plus className="w-3.5 h-3.5 cursor-pointer" />
@@ -136,35 +202,110 @@ export default function Sidebar() {
               </button>
             </div>
 
-            {loading && (
-              <div className="px-2 py-1.5 flex items-center gap-2 text-sidebar-foreground/40">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span className="text-xs">Loading...</span>
-              </div>
+            {workspaceExpanded && (
+              <>
+                {isLoading && (
+                  <div className="px-2 py-1.5 flex items-center gap-2 text-sidebar-foreground/40">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span className="text-xs">Loading...</span>
+                  </div>
+                )}
+
+                {!isLoading && workspaceDocs.length === 0 && (
+                  <div className="px-2 py-1.5 text-xs text-sidebar-foreground/40 italic">
+                    No documents yet
+                  </div>
+                )}
+
+                {workspaceDocs.map((doc: Document) => (
+                  <div
+                    key={doc.id}
+                    className={`group relative flex items-center gap-2 w-full px-2 py-1.5 rounded-md transition-all duration-150 text-sm font-medium cursor-pointer ${
+                      activeId === doc.id
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                        : "hover:bg-sidebar-accent/50 text-sidebar-foreground/80 hover:text-sidebar-foreground"
+                    }`}
+                    onClick={() => navigate(`/doc/${doc.id}`)}
+                  >
+                    <FileText
+                      className={`w-4 h-4 shrink-0 ${activeId === doc.id ? "text-sidebar-accent-foreground" : "text-sidebar-foreground/60"}`}
+                    />
+                    <span className="truncate flex-1">{doc.title}</span>
+                    
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <button className="p-0.5 rounded hover:bg-sidebar-accent-foreground/10 transition-colors">
+                            {deleteMutation.isPending && deleteMutation.variables === doc.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <MoreHorizontal className="w-3.5 h-3.5 text-sidebar-foreground/60" />
+                            )}
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedDocumentId(doc.id);
+                              setIsCollaboratorDialogOpen(true);
+                            }}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <UserPlus className="w-4 h-4" />
+                            <span>Add Collaborators</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteDocument(doc.id);
+                            }}
+                            className="flex items-center gap-2 text-red-500 focus:text-red-500 cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span>Delete Document</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+              </>
             )}
 
-            {!loading && documents.length === 0 && (
-              <div className="px-2 py-1.5 text-xs text-sidebar-foreground/40 italic">
-                No documents yet
-              </div>
+            {sharedDocs.length > 0 && (
+              <>
+                <div className="px-1 text-[11px] font-bold text-sidebar-foreground/40 uppercase tracking-widest mt-6 mb-1.5">
+                  <button 
+                    onClick={() => setSharedDocsExpanded(!sharedDocsExpanded)}
+                    className="flex items-center gap-1 hover:text-sidebar-foreground/60 transition-colors"
+                  >
+                    {sharedDocsExpanded ? (
+                      <ChevronDown className="w-3 h-3" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3" />
+                    )}
+                    <span>Shared with me</span>
+                  </button>
+                </div>
+                {sharedDocsExpanded && sharedDocs.map((doc: Document) => (
+                  <div
+                    key={doc.id}
+                    className={`group relative flex items-center gap-2 w-full px-2 py-1.5 rounded-md transition-all duration-150 text-sm font-medium cursor-pointer ${
+                      activeId === doc.id
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                        : "hover:bg-sidebar-accent/50 text-sidebar-foreground/80 hover:text-sidebar-foreground"
+                    }`}
+                    onClick={() => navigate(`/doc/${doc.id}`)}
+                  >
+                    <FileText
+                      className={`w-4 h-4 shrink-0 ${activeId === doc.id ? "text-sidebar-accent-foreground" : "text-sidebar-foreground/60"}`}
+                    />
+                    <span className="truncate flex-1">{doc.title}</span>
+                  </div>
+                ))}
+              </>
             )}
-
-            {documents.map((doc) => (
-              <button
-                key={doc.id}
-                onClick={() => navigate(`/doc/${doc.id}`)}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-md transition-all duration-150 text-sm font-medium ${
-                  activeId === doc.id
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-                    : "hover:bg-sidebar-accent/50 text-sidebar-foreground/80 hover:text-sidebar-foreground"
-                }`}
-              >
-                <FileText
-                  className={`w-4 h-4 ${activeId === doc.id ? "text-sidebar-accent-foreground" : "text-sidebar-foreground/60"}`}
-                />
-                <span className="truncate">{doc.title}</span>
-              </button>
-            ))}
           </div>
         </div>
 
@@ -202,6 +343,56 @@ export default function Sidebar() {
           </button>
         </div>
       </div>
+
+      <Dialog open={isCollaboratorDialogOpen} onOpenChange={setIsCollaboratorDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Collaborator</DialogTitle>
+            <DialogDescription>
+              Enter the email address of the person you want to collaborate with.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email address</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="colleague@example.com"
+                value={collaboratorEmail}
+                onChange={(e) => setCollaboratorEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleAddCollaborator();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCollaboratorDialogOpen(false)}
+              disabled={addCollaboratorMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddCollaborator}
+              disabled={addCollaboratorMutation.isPending || !collaboratorEmail}
+            >
+              {addCollaboratorMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add Collaborator"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ShadcnSidebar>
   );
 }

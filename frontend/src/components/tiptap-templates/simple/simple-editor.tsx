@@ -59,12 +59,22 @@ import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
 import { HighlighterIcon } from "@/components/tiptap-icons/highlighter-icon"
 import { LinkIcon } from "@/components/tiptap-icons/link-icon"
-import { Loader2 } from "lucide-react"
+import { Loader2, Users, Clock } from "lucide-react"
 
 // --- Hooks ---
 import { useIsBreakpoint } from "@/hooks/use-is-breakpoint"
 import { useWindowSize } from "@/hooks/use-window-size"
 import { useCursorVisibility } from "@/hooks/use-cursor-visibility"
+import { formatDistanceToNow } from "date-fns"
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription,
+} from "@/components/ui/dialog"
 
 // --- Components ---
 import { ThemeToggle } from "@/components/tiptap-templates/simple/theme-toggle"
@@ -76,6 +86,7 @@ import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 import "@/components/tiptap-templates/simple/simple-editor.scss"
 
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
 const MainToolbarContent = ({
   onHighlighterClick,
@@ -185,19 +196,168 @@ const MobileToolbarContent = ({
     )}
   </>
 )
+const CollaboratorsDialog = ({
+  collaborators,
+  owner,
+}: {
+  collaborators: any[]
+  owner: any
+}) => {
+  if (!owner) return null
+
+  // Combine owner and collaborators into a single list
+  const allAccess = [
+    { user: owner, role: "OWNER" },
+    ...collaborators.filter((c) => c.userId !== owner.id),
+  ]
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors h-8 px-2 rounded-md hover:bg-muted group">
+          <Users className="w-4 h-4 group-hover:scale-110 transition-transform" />
+          <span className="hidden sm:inline">Collaborators</span>
+          <span className="flex items-center justify-center min-w-[20px] h-5 bg-blue-600 text-white text-[10px] font-bold rounded-full px-1.5 shadow-sm shrink-0 border border-white dark:border-zinc-800">
+            {allAccess.length}
+          </span>
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Document Access</DialogTitle>
+          <DialogDescription>
+            These people have access to this document.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          {allAccess.map((item, idx) => (
+            <div
+              key={idx}
+              className="flex items-center justify-between gap-4 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-medium shadow-sm overflow-hidden shrink-0">
+                  {item.user.image ? (
+                    <img
+                      src={item.user.image}
+                      alt={item.user.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    item.user.name.charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-semibold text-foreground truncate">
+                    {item.user.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {item.user.email}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
+                {item.role}
+              </div>
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+
+const EditorTopbar = ({
+  title,
+  updatedAt,
+  collaborators,
+  owner,
+}: {
+  title: string
+  updatedAt?: string
+  collaborators: any[]
+  owner: any
+}) => {
+  return (
+    <div className="flex items-center justify-between px-4 py-0 border-b bg-background/80 backdrop-blur-md sticky top-0 z-50 h-12">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 shrink-0">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+        </div>
+        <span className="text-sm font-semibold text-foreground truncate">
+          {title || "Untitled Document"}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-4">
+        {updatedAt && (
+          <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
+            <Clock className="w-3.5 h-3.5" />
+            <span>
+              Edited{" "}
+              {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
+            </span>
+          </div>
+        )}
+
+        <div className="h-4 w-px bg-border hidden sm:block" />
+
+        <CollaboratorsDialog collaborators={collaborators} owner={owner} />
+      </div>
+    </div>
+  )
+}
 
 import { documentClient } from "@/lib/document-client"
 import { debounce } from "lodash"
 
 export function SimpleEditor({ documentId }: { documentId: string }) {
+  const queryClient = useQueryClient()
   const isMobile = useIsBreakpoint()
   const { height } = useWindowSize()
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
     "main"
   )
-  const [title, setTitle] = useState("")
-  const [loading, setLoading] = useState(true)
   const toolbarRef = useRef<HTMLDivElement>(null)
+  const [localTitle, setLocalTitle] = useState("")
+
+  // Queries
+  const { data: document, isLoading } = useQuery({
+    queryKey: ["document", documentId],
+    queryFn: async () => {
+      const doc = await documentClient.get(documentId)
+      setLocalTitle(doc.title)
+      return doc
+    },
+    enabled: !!documentId,
+  })
+
+  // Mutations
+  const updateMutation = useMutation({
+    mutationFn: (updates: { title?: string; content?: any }) =>
+      documentClient.update(documentId, updates),
+    onSuccess: (updatedDoc) => {
+      // Update the cache for this specific document
+      queryClient.setQueryData(["document", documentId], updatedDoc)
+      // If title changed, we might want to refresh the sidebar list
+      if (updatedDoc.title) {
+        queryClient.invalidateQueries({ queryKey: ["documents"] })
+      }
+    },
+  })
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -246,45 +406,31 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
   })
 
   const debouncedSave = useRef(
-    debounce(async (content: any) => {
-      try {
-        await documentClient.update(documentId, { content })
-      } catch (error) {
-        console.error("Failed to save document content", error)
-      }
+    debounce((content: any) => {
+      updateMutation.mutate({ content })
     }, 1000)
   ).current
 
-  const handleTitleChange = async (newTitle: string) => {
-    setTitle(newTitle)
-    try {
-      await documentClient.update(documentId, { title: newTitle })
-      // Consider updating the sidebar title as well, maybe via a context or higher-level state
-    } catch (error) {
-      console.error("Failed to update title", error)
-    }
+  const debouncedTitleSave = useRef(
+    debounce((title: string) => {
+      updateMutation.mutate({ title })
+    }, 1000)
+  ).current
+
+  const handleTitleChange = (newTitle: string) => {
+    setLocalTitle(newTitle)
+    debouncedTitleSave(newTitle)
   }
 
   useEffect(() => {
-    const fetchDoc = async () => {
-      setLoading(true)
-      try {
-        const doc = await documentClient.get(documentId)
-        setTitle(doc.title)
-        if (editor) {
-          editor.commands.setContent(doc.content || "")
-        }
-      } catch (error) {
-        console.error("Failed to load document", error)
-      } finally {
-        setLoading(false)
+    if (document && editor && !editor.isFocused) {
+      // Only set content if it's different to avoid cursor jumps
+      const currentContent = editor.getJSON()
+      if (JSON.stringify(currentContent) !== JSON.stringify(document.content)) {
+        editor.commands.setContent(document.content || "")
       }
     }
-
-    if (documentId && editor) {
-      fetchDoc()
-    }
-  }, [documentId, editor])
+  }, [document, editor])
 
   const rect = useCursorVisibility({
     editor,
@@ -297,7 +443,7 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
     }
   }, [isMobile, mobileView])
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -305,9 +451,23 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
     )
   }
 
+  if (!document) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <p className="text-muted-foreground">Document not found</p>
+      </div>
+    )
+  }
+
   return (
     <div className="simple-editor-wrapper">
       <EditorContext.Provider value={{ editor }}>
+        <EditorTopbar
+          title={localTitle}
+          updatedAt={document.updatedAt}
+          collaborators={document.collaborators || []}
+          owner={document.owner}
+        />
         <Toolbar
           ref={toolbarRef}
           style={{
@@ -315,7 +475,9 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
               ? {
                   bottom: `calc(100% - ${height - rect.y}px)`,
                 }
-              : {}),
+              : {
+                  top: "48px",
+                }),
           }}
         >
           {mobileView === "main" ? (
@@ -335,7 +497,7 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
         <div className="max-w-[750px] mx-auto w-full pt-16 px-8">
           <input
             type="text"
-            value={title}
+            value={localTitle}
             onChange={(e) => handleTitleChange(e.target.value)}
             className="w-full text-4xl font-bold bg-transparent border-none outline-none mb-4 placeholder:text-muted-foreground/30"
             placeholder="Untitled"

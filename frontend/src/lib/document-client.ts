@@ -22,4 +22,12 @@ export const documentClient = {
     const response = await api.put(`/documents/${id}`, updates);
     return response.data;
   },
+  delete: async (id: string) => {
+    const response = await api.delete(`/documents/${id}`);
+    return response.data;
+  },
+  addCollaborator: async (id: string, email: string, role: string) => {
+    const response = await api.post(`/documents/${id}/collaborators`, { email, role });
+    return response.data;
+  },
 };
