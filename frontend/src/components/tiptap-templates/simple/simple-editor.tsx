@@ -1,7 +1,5 @@
 "use client"
 
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { EditorContent, EditorContext, useEditor } from "@tiptap/react"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -18,13 +16,7 @@ import { Selection } from "@tiptap/extensions"
 import { StarterKit } from "@tiptap/starter-kit"
 
 // --- UI Primitives ---
-import { Button } from "@/components/tiptap-ui-primitive/button"
-import { Spacer } from "@/components/tiptap-ui-primitive/spacer"
-import {
-  Toolbar,
-  ToolbarGroup,
-  ToolbarSeparator,
-} from "@/components/tiptap-ui-primitive/toolbar"
+import { Toolbar } from "@/components/tiptap-ui-primitive/toolbar"
 import { Placeholder } from "@tiptap/extension-placeholder"
 
 // --- Tiptap Node ---
@@ -38,49 +30,17 @@ import { ImageUploadNode } from "@/components/tiptap-node/image-upload-node/imag
 import "@/components/tiptap-node/list-node/list-node.scss"
 import "@/components/tiptap-node/paragraph-node/paragraph-node.scss"
 
-// --- Tiptap UI ---
-import { BlockquoteButton } from "@/components/tiptap-ui/blockquote-button"
-import { CodeBlockButton } from "@/components/tiptap-ui/code-block-button"
-import {
-  ColorHighlightPopover,
-  ColorHighlightPopoverButton,
-  ColorHighlightPopoverContent,
-} from "@/components/tiptap-ui/color-highlight-popover"
-import { HeadingDropdownMenu } from "@/components/tiptap-ui/heading-dropdown-menu"
-import { ImageUploadButton } from "@/components/tiptap-ui/image-upload-button"
-import {
-  LinkButton,
-  LinkContent,
-  LinkPopover,
-} from "@/components/tiptap-ui/link-popover"
-import { ListDropdownMenu } from "@/components/tiptap-ui/list-dropdown-menu"
-import { MarkButton } from "@/components/tiptap-ui/mark-button"
-import { TextAlignButton } from "@/components/tiptap-ui/text-align-button"
-import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
-
 // --- Icons ---
-import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
-import { HighlighterIcon } from "@/components/tiptap-icons/highlighter-icon"
-import { LinkIcon } from "@/components/tiptap-icons/link-icon"
-import { Clock, Loader2, Users } from "lucide-react"
+import { Loader2 } from "lucide-react"
 
 // --- Hooks ---
 import { useCursorVisibility } from "@/hooks/use-cursor-visibility"
 import { useIsBreakpoint } from "@/hooks/use-is-breakpoint"
 import { useWindowSize } from "@/hooks/use-window-size"
-import { formatDistanceToNow } from "date-fns"
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-
-// --- Components ---
-import { ThemeToggle } from "@/components/tiptap-templates/simple/theme-toggle"
+// --- Extracted Components ---
+import { EditorTopbar } from "./editor-topbar"
+import { MainToolbarContent, MobileToolbarContent } from "./editor-toolbar"
 
 // --- Lib ---
 import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
@@ -88,318 +48,12 @@ import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss"
 
-import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { authClient } from "@/lib/auth-client"
 
-const MainToolbarContent = ({
-  onHighlighterClick,
-  onLinkClick,
-  isMobile,
-}: {
-  onHighlighterClick: () => void
-  onLinkClick: () => void
-  isMobile: boolean
-}) => {
-  return (
-    <>
-      <SidebarTrigger className="-ml-1 mr-1" />
-      <Spacer />
-
-      <ToolbarGroup>
-        <UndoRedoButton action="undo" />
-        <UndoRedoButton action="redo" />
-      </ToolbarGroup>
-
-      <ToolbarSeparator />
-
-      <ToolbarGroup>
-        <HeadingDropdownMenu modal={false} levels={[1, 2, 3, 4]} />
-        <ListDropdownMenu
-          modal={false}
-          types={["bulletList", "orderedList", "taskList"]}
-        />
-        <BlockquoteButton />
-        <CodeBlockButton />
-      </ToolbarGroup>
-
-      <ToolbarSeparator />
-
-      <ToolbarGroup>
-        <MarkButton type="bold" />
-        <MarkButton type="italic" />
-        <MarkButton type="strike" />
-        <MarkButton type="code" />
-        <MarkButton type="underline" />
-        {!isMobile ? (
-          <ColorHighlightPopover />
-        ) : (
-          <ColorHighlightPopoverButton onClick={onHighlighterClick} />
-        )}
-        {!isMobile ? <LinkPopover /> : <LinkButton onClick={onLinkClick} />}
-      </ToolbarGroup>
-
-      <ToolbarSeparator />
-
-      <ToolbarGroup>
-        <MarkButton type="superscript" />
-        <MarkButton type="subscript" />
-      </ToolbarGroup>
-
-      <ToolbarSeparator />
-
-      <ToolbarGroup>
-        <TextAlignButton align="left" />
-        <TextAlignButton align="center" />
-        <TextAlignButton align="right" />
-        <TextAlignButton align="justify" />
-      </ToolbarGroup>
-
-      <ToolbarSeparator />
-
-      <ToolbarGroup>
-        <ImageUploadButton text="Add" />
-      </ToolbarGroup>
-
-      <Spacer />
-
-      {isMobile && <ToolbarSeparator />}
-
-      <ToolbarGroup>
-        <ThemeToggle />
-      </ToolbarGroup>
-    </>
-  )
-}
-
-const MobileToolbarContent = ({
-  type,
-  onBack,
-}: {
-  type: "highlighter" | "link"
-  onBack: () => void
-}) => (
-  <>
-    <ToolbarGroup>
-      <Button variant="ghost" onClick={onBack}>
-        <ArrowLeftIcon className="tiptap-button-icon" />
-        {type === "highlighter" ? (
-          <HighlighterIcon className="tiptap-button-icon" />
-        ) : (
-          <LinkIcon className="tiptap-button-icon" />
-        )}
-      </Button>
-    </ToolbarGroup>
-
-    <ToolbarSeparator />
-
-    {type === "highlighter" ? (
-      <ColorHighlightPopoverContent />
-    ) : (
-      <LinkContent />
-    )}
-  </>
-)
-
-const CollaboratorsDialog = ({
-  collaborators,
-  owner,
-  onAddCollaborator,
-  isAdding,
-  canInvite,
-}: {
-  collaborators: any[]
-  owner: any
-  onAddCollaborator: (email: string, role: string) => void
-  isAdding: boolean
-  canInvite: boolean
-}) => {
-  const [email, setEmail] = useState("")
-  const [role, setRole] = useState<"EDITOR" | "VIEWER">("EDITOR")
-
-  if (!owner) return null
-
-  // Combine owner and collaborators into a single list
-  const allAccess = [
-    { user: owner, role: "OWNER" },
-    ...collaborators.filter((c) => c.userId !== owner.id),
-  ]
-
-  const handleAdd = () => {
-    if (!email) return
-    onAddCollaborator(email, role)
-    setEmail("")
-  }
-
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <button className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors h-8 px-2 rounded-md hover:bg-muted group">
-          <Users className="w-4 h-4 group-hover:scale-110 transition-transform" />
-          <span className="hidden sm:inline">Collaborators</span>
-          <span className="flex items-center justify-center min-w-[20px] h-5 bg-blue-600 text-white text-[10px] font-bold rounded-full px-1.5 shadow-sm shrink-0 border border-white dark:border-zinc-800">
-            {allAccess.length}
-          </span>
-        </button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Document Access</DialogTitle>
-          <DialogDescription>
-            Invite others to collaborate on this document.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          {canInvite && (
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Add Collaborator</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="email"
-                  placeholder="email@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="flex-1 text-xs"
-                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                />
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as any)}
-                  className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="EDITOR">Editor</option>
-                  <option value="VIEWER">Viewer</option>
-                </select>
-                <Button
-                  variant="primary"
-                  size="small"
-                  onClick={handleAdd}
-                  disabled={isAdding || !email}
-                  className="h-8 px-3"
-                >
-                  {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : "Invite"}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {canInvite && <div className="h-px bg-border" />}
-
-          <div className="space-y-3">
-            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">People with access</Label>
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-              {allAccess.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between gap-4 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-medium shadow-sm overflow-hidden shrink-0 text-xs">
-                      {item.user.image ? (
-                        <img
-                          src={item.user.image}
-                          alt={item.user.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        item.user.name?.charAt(0).toUpperCase() || item.user.email?.charAt(0).toUpperCase()
-                      )}
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-semibold text-foreground truncate">
-                        {item.user.name || "Anonymous"}
-                      </span>
-                      <span className="text-xs text-muted-foreground truncate">
-                        {item.user.email}
-                      </span>
-                    </div>
-                  </div>
-                  <div className={`flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${
-                    item.role === "OWNER" 
-                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" 
-                      : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                  }`}>
-                    {item.role}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-
-const EditorTopbar = ({
-  title,
-  updatedAt,
-  collaborators,
-  owner,
-  onAddCollaborator,
-  isAdding,
-  canInvite,
-}: {
-  title: string
-  updatedAt?: string
-  collaborators: any[]
-  owner: any
-  onAddCollaborator: (email: string, role: string) => void
-  isAdding: boolean
-  canInvite: boolean
-}) => {
-  return (
-    <div className="flex items-center justify-between px-4 py-0 border-b bg-background/80 backdrop-blur-md sticky top-0 z-50 h-12">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 shrink-0">
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-            <polyline points="14 2 14 8 20 8" />
-          </svg>
-        </div>
-        <span className="text-sm font-semibold text-foreground truncate">
-          {title || "Untitled Document"}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-4">
-        {updatedAt && (
-          <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
-            <Clock className="w-3.5 h-3.5" />
-            <span>
-              Edited{" "}
-              {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
-            </span>
-          </div>
-        )}
-
-        <div className="h-4 w-px bg-border hidden sm:block" />
-
-        <CollaboratorsDialog 
-          collaborators={collaborators} 
-          owner={owner} 
-          onAddCollaborator={onAddCollaborator}
-          isAdding={isAdding}
-          canInvite={canInvite}
-        />
-      </div>
-    </div>
-  )
-}
-
 import { documentClient } from "@/lib/document-client"
 import { debounce } from "lodash"
+import { io, Socket } from "socket.io-client"
 
 export function SimpleEditor({ documentId }: { documentId: string }) {
   const queryClient = useQueryClient()
@@ -411,6 +65,13 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
   const { data: session } = authClient.useSession()
   const toolbarRef = useRef<HTMLDivElement>(null)
   const [localTitle, setLocalTitle] = useState("")
+
+  // Socket state
+  const [socket, setSocket] = useState<Socket | null>(null)
+  const isProgrammaticUpdate = useRef(false)
+  const programmaticUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [typingUser, setTypingUser] = useState<string | null>(null)
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Queries
   const { data: document, isLoading } = useQuery({
@@ -445,6 +106,26 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
   const isViewer = currentUserRole === 'VIEWER';
   const canInvite = document?.ownerId === session?.user?.id;
 
+  // Socket Connection
+  useEffect(() => {
+    if (!documentId) return;
+
+    const newSocket = io(import.meta.env.VITE_API_URL || "http://localhost:3000", {
+      withCredentials: true,
+    });
+
+    setSocket(newSocket);
+
+    newSocket.on("connect", () => {
+      newSocket.emit("join-document", documentId);
+    });
+
+    return () => {
+      newSocket.emit("leave-document", documentId);
+      newSocket.disconnect();
+    };
+  }, [documentId]);
+
   const addCollaboratorMutation = useMutation({
     mutationFn: ({ email, role }: { email: string; role: string }) =>
       documentClient.addCollaborator(documentId, email, role),
@@ -466,6 +147,15 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
         autocapitalize: "off",
         "aria-label": "Main content area, start typing to enter text.",
         class: "simple-editor",
+      },
+      handleKeyDown: () => {
+        if (!isViewer && socket) {
+          socket.emit("document:typing", {
+            documentId,
+            user: session?.user,
+          });
+        }
+        return false;
       },
     },
     extensions: [
@@ -500,7 +190,15 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
     ],
     onUpdate: ({ editor }) => {
       if (!isViewer) {
-        debouncedSave(editor.getJSON())
+        const content = editor.getJSON()
+        debouncedSave(content)
+
+        if (!isProgrammaticUpdate.current && socket) {
+          socket.emit("document:update", {
+            documentId,
+            content,
+          });
+        }
       }
     },
   })
@@ -521,6 +219,13 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
     if (isViewer) return
     setLocalTitle(newTitle)
     debouncedTitleSave(newTitle)
+    
+    if (socket) {
+      socket.emit("document:update", {
+        documentId,
+        title: newTitle,
+      })
+    }
   }
 
   useEffect(() => {
@@ -535,11 +240,71 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
         // Only set content if it's different to avoid cursor jumps
         const currentContent = editor.getJSON()
         if (JSON.stringify(currentContent) !== JSON.stringify(document.content)) {
-          editor.commands.setContent(document.content || "")
+          if (programmaticUpdateTimeoutRef.current) clearTimeout(programmaticUpdateTimeoutRef.current);
+          isProgrammaticUpdate.current = true;
+          
+          editor.commands.setContent(document.content || "", false);
+          
+          programmaticUpdateTimeoutRef.current = setTimeout(() => {
+            isProgrammaticUpdate.current = false;
+          }, 50);
         }
       }
     }
   }, [document, editor, isViewer])
+
+  // Socket event listeners
+  useEffect(() => {
+    if (!socket || !editor) return;
+
+    const handleUpdate = ({ content, title }: { content: any; title?: string }) => {
+      if (title && title !== localTitle) {
+        setLocalTitle(title);
+      }
+      
+      if (content) {
+        const currentContent = editor.getJSON();
+        if (JSON.stringify(currentContent) !== JSON.stringify(content)) {
+          if (programmaticUpdateTimeoutRef.current) clearTimeout(programmaticUpdateTimeoutRef.current);
+          isProgrammaticUpdate.current = true;
+          
+          const { from, to } = editor.state.selection;
+          editor.commands.setContent(content, false);
+          
+          try {
+            editor.commands.setTextSelection({ from, to });
+          } catch (e) {
+            // ignore out of bounds
+          }
+          
+          programmaticUpdateTimeoutRef.current = setTimeout(() => {
+            isProgrammaticUpdate.current = false;
+          }, 50);
+        }
+      }
+    };
+
+    const handleTyping = ({ user }: { user: any }) => {
+      if (!user || user.id === session?.user?.id) return;
+      
+      setTypingUser(user.name || "Someone");
+      
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      
+      typingTimeoutRef.current = setTimeout(() => {
+        setTypingUser(null);
+      }, 2000);
+    };
+
+    socket.on("document:update", handleUpdate);
+    socket.on("document:typing", handleTyping);
+
+    return () => {
+      socket.off("document:update", handleUpdate);
+      socket.off("document:typing", handleTyping);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, [socket, editor, session, localTitle]);
 
   const rect = useCursorVisibility({
     editor,
@@ -608,7 +373,12 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
           </Toolbar>
         )}
 
-        <div className="max-w-[750px] mx-auto w-full pt-16 px-8">
+        <div className="max-w-[750px] mx-auto w-full pt-16 px-8 relative">
+          {typingUser && (
+            <div className="absolute top-6 left-8 text-xs font-medium text-blue-500 animate-pulse">
+              {typingUser} is typing...
+            </div>
+          )}
           <input
             type="text"
             readOnly={isViewer}

@@ -48,9 +48,21 @@ app.get("/api/me", async (req, res) => {
 io.on("connection", (socket: Socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  socket.on("message", (data) => {
-    console.log("Received message:", data);
-    socket.broadcast.emit("message", data);
+  socket.on("join-document", (documentId) => {
+    socket.join(documentId);
+    console.log(`User ${socket.id} joined document ${documentId}`);
+  });
+
+  socket.on("leave-document", (documentId) => {
+    socket.leave(documentId);
+  });
+
+  socket.on("document:update", ({ documentId, content, title }) => {
+    socket.to(documentId).emit("document:update", { content, title });
+  });
+
+  socket.on("document:typing", ({ documentId, user }) => {
+    socket.to(documentId).emit("document:typing", { user });
   });
 
   socket.on("disconnect", () => {
