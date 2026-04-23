@@ -110,7 +110,7 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
   useEffect(() => {
     if (!documentId) return;
 
-    const newSocket = io(import.meta.env.VITE_API_URL || "http://localhost:3000", {
+    const newSocket = io(import.meta.env.BACKEND_URL || "http://localhost:3000", {
       withCredentials: true,
     });
 
