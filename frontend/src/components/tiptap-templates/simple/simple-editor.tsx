@@ -69,9 +69,9 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
   // Socket state
   const [socket, setSocket] = useState<Socket | null>(null)
   const isProgrammaticUpdate = useRef(false)
-  const programmaticUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const programmaticUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [typingUser, setTypingUser] = useState<string | null>(null)
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Queries
   const { data: document, isLoading } = useQuery({
@@ -243,7 +243,7 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
           if (programmaticUpdateTimeoutRef.current) clearTimeout(programmaticUpdateTimeoutRef.current);
           isProgrammaticUpdate.current = true;
           
-          editor.commands.setContent(document.content || "", false);
+          editor.commands.setContent(document.content || "", { emitUpdate: false });
           
           programmaticUpdateTimeoutRef.current = setTimeout(() => {
             isProgrammaticUpdate.current = false;
@@ -269,7 +269,7 @@ export function SimpleEditor({ documentId }: { documentId: string }) {
           isProgrammaticUpdate.current = true;
           
           const { from, to } = editor.state.selection;
-          editor.commands.setContent(content, false);
+          editor.commands.setContent(content, { emitUpdate: false });
           
           try {
             editor.commands.setTextSelection({ from, to });
